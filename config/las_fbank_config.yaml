@@ -21,7 +21,7 @@ model_parameter:
   bucketing: False                            # Bucket training data by input sequence length 
   
   language_scp: 'data/text.tr95'              # label list to load language info.
-  train_scp_path: 'data/tr.scp'
+  train_scp_path: 'data/train.scp'
   train_lab_path: 'data/text.tr95'
   valid_scp_path: 'data/cv.scp'
   valid_lab_path: 'data/text.cv05'
