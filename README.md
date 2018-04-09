@@ -47,5 +47,5 @@ This is a pytorch implementation of attention based end to end model, LAS, for s
 -
 
 ## References
--[Listen, Attend and Spell](https://arxiv.org/abs/1508.01211v2) (LAS)  published in ICASSP 2016.
+- [Listen, Attend and Spell](https://arxiv.org/abs/1508.01211v2) (LAS)  published in ICASSP 2016.
 - 
