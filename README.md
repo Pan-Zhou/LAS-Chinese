@@ -36,9 +36,10 @@ This is a pytorch implementation of attention based end to end model, LAS, for s
     
     Training log will be stored at `log/` while model checkpoint at ` checkpoint/`
     
-    For a customized experiment, please read and modify [`config/las_example_config.yaml`](config/las_example_config.yaml)
+    For a customized experiment, please read and modify [`config/las_bank_config.yaml`](config/las_fbank_config.yaml)
 
 ## ToDo
+- Add attention mechanism
 - Beam search decoding
 - Rescore or decode with Language model 
 - Chinese initial finals modeling units
