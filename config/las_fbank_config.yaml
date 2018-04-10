@@ -15,6 +15,7 @@ model_parameter:
   speller_rnn_layer: 1                        # speller RNN layer number 
   speller_hidden_dim: 512                     # speller LSTM output dimension
   embed_dim: 512                              # embedding dimemsion
+  use_listener_state: True                    # use listener state as speller history
   output_class_dim: 63                        # number of characters + 3 for <sos> & <eos> & <UNK>
   rnn_unit: 'LSTM'                            # Default recurrent unit
   use_gpu: True

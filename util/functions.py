@@ -82,11 +82,11 @@ def batch_iterator(batch_data, batch_label, listener, speller, optimizer, tf_rat
         objective = objective.cuda()
     # Forwarding
     optimizer.zero_grad()
-    listner_feature = listener(batch_data)
+    listner_feature, hid_state0 = listener(batch_data)
     if is_training:
-        raw_pred_seq, attention_record = speller(listner_feature,ground_truth=batch_label,teacher_force_rate=tf_rate)
+        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=batch_label,teacher_force_rate=tf_rate)
     else:
-        raw_pred_seq, attention_record = speller(listner_feature,ground_truth=None,teacher_force_rate=0)
+        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=None,teacher_force_rate=0)
 
     pred_y = torch.cat([torch.unsqueeze(each_y,1) for each_y in raw_pred_seq],1).view(-1,output_class_dim)
     true_y = torch.max(batch_label,dim=2)[1].view(-1)

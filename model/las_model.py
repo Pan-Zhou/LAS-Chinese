@@ -51,13 +51,14 @@ class Listener(nn.Module):
         output, _ = self.BLSTM(input_x)
         output, _ = self.pLSTM_layer1(output)
         output, _ = self.pLSTM_layer2(output)
-        output, _ = self.pLSTM_layer3(output)
-        return output
+        output0,hid0 = self.pLSTM_layer3(output[:,0:2,:])
+        output, hidT = self.pLSTM_layer3(output)
+        return output,(Variable(torch.transpose(output[:,0:1,:].data,0,1)),Variable(torch.cat((hid0[1][0:1,:,:].data,hidT[1][1:,:,:].data),2)))
 
 
 # Speller specified in the paper
 class Speller(nn.Module):
-    def __init__(self, output_class_dim, embed_dim, speller_hidden_dim, rnn_unit, speller_rnn_layer, use_gpu, max_label_len,
+    def __init__(self, output_class_dim, embed_dim, use_listener_state, speller_hidden_dim, rnn_unit, speller_rnn_layer, use_gpu, max_label_len,
                  use_mlp_in_attention, mlp_dim_in_attention, mlp_activate_in_attention, num_heads, listener_hidden_dim, **kwargs):
         super(Speller, self).__init__()
         self.rnn_unit = getattr(nn,rnn_unit.upper())
@@ -65,9 +66,10 @@ class Speller(nn.Module):
         self.use_gpu = use_gpu
         self.float_type = torch.torch.cuda.FloatTensor if use_gpu else torch.FloatTensor
         self.label_dim = output_class_dim
+        self.use_listener_state = use_listener_state
         self.embed_dim = embed_dim
         self.embedding = nn.Embedding(output_class_dim, embed_dim)
-        self.rnn_layer = self.rnn_unit(embed_dim+2*listener_hidden_dim,speller_hidden_dim,num_layers=speller_rnn_layer)
+        self.rnn_layer = self.rnn_unit(embed_dim+2*listener_hidden_dim,speller_hidden_dim,num_layers=speller_rnn_layer,batch_first=True)
         self.attention = Attention( mlp_preprocess_input=use_mlp_in_attention, preprocess_mlp_dim=mlp_dim_in_attention,
                                     activate=mlp_activate_in_attention, heads=num_heads, input_feature_dim=2*listener_hidden_dim)
         self.predict_hid = nn.Linear(speller_hidden_dim*2,512)
@@ -86,7 +88,7 @@ class Speller(nn.Module):
 
         return raw_pred, hidden_state, context, attention_score
 
-    def forward(self, listener_feature, ground_truth=None, teacher_force_rate = 0.9):
+    def forward(self, listener_feature, hid_state=None, ground_truth=None, teacher_force_rate = 0.9):
         if ground_truth is None:
             teacher_force_rate = 0
         teacher_force = True if np.random.random_sample() < teacher_force_rate else False
@@ -97,7 +99,12 @@ class Speller(nn.Module):
         output_word = self.embedding(Variable(torch.LongTensor(np.ones((batch_size,1)) )).cuda())
         rnn_input = torch.cat([output_word,listener_feature[:,0:1,:]],dim=-1)
 
-        hidden_state = None
+        if self.use_listener_state:
+            ##use listener hid_state of t=0 as the history of speller
+            hidden_state = hid_state
+        else:
+            hidden_state = None
+
         raw_pred_seq = []
         output_seq = []
         attention_record = []
