@@ -96,7 +96,7 @@ class Speller(nn.Module):
         batch_size = listener_feature.size()[0]
 
         #output_word = CreateOnehotVariable(self.float_type(np.zeros((batch_size,1))),self.label_dim)
-        output_word = self.embedding(Variable(torch.LongTensor(np.ones((batch_size,1)) )).cuda())
+        output_word = self.embedding(Variable(torch.LongTensor(np.zeros((batch_size,1)) )).cuda())
         rnn_input = torch.cat([output_word,listener_feature[:,0:1,:]],dim=-1)
 
         if self.use_listener_state:
