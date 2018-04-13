@@ -63,7 +63,7 @@ def LetterErrorRate(pred_y,true_y):
         ed_accumalate.append(ed.eval(compressed_p,compressed_t)/len(compressed_t))
     return ed_accumalate
 
-def batch_iterator(batch_data, batch_label, listener, speller, optimizer, tf_rate, is_training, **kwargs):
+def batch_iterator(batch_data, batch_label, lab_len, listener, speller, optimizer, tf_rate, is_training, **kwargs):
     bucketing = kwargs['bucketing']
     use_gpu = kwargs['use_gpu']
     max_label_len = kwargs['max_label_len']
@@ -84,9 +84,9 @@ def batch_iterator(batch_data, batch_label, listener, speller, optimizer, tf_rat
     optimizer.zero_grad()
     listner_feature, hid_state0 = listener(batch_data)
     if is_training:
-        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=batch_label,teacher_force_rate=tf_rate)
+        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=batch_label, label_len=lab_len, teacher_force_rate=tf_rate)
     else:
-        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=None,teacher_force_rate=0)
+        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=None,label_len = None, teacher_force_rate=0)
 
     pred_y = torch.cat([torch.unsqueeze(each_y,1) for each_y in raw_pred_seq],1).view(-1,output_class_dim)
     true_y = torch.max(batch_label,dim=2)[1].view(-1)
@@ -100,8 +100,9 @@ def batch_iterator(batch_data, batch_label, listener, speller, optimizer, tf_rat
 
     batch_loss = loss.cpu().data.numpy()
     # variable -> numpy before sending into LER calculator
-    batch_ler = LetterErrorRate(torch.max(pred_y,dim=1)[1].cpu().data.numpy().reshape(current_batch_size,max_label_len),
-                                true_y.cpu().data.numpy().reshape(current_batch_size,max_label_len))
+    max_lab_step = max(lab_len) if is_training else max_label_len
+    batch_ler = LetterErrorRate(torch.max(pred_y,dim=1)[1].cpu().data.numpy().reshape(current_batch_size,max_lab_step),
+                                true_y.cpu().data.numpy().reshape(current_batch_size,max_lab_step))
     return batch_loss, batch_ler
 
 def log_parser(log_file_path):

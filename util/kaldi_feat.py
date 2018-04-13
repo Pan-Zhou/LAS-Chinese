@@ -60,7 +60,10 @@ class Language:
         lines = open(name).read().strip().split('\n')
         for l in lines:
             ll=l.strip(' ').split(' ')
-            sentence = ' '.join(ll[1:])
+            if len(ll)>1:
+                sentence = ' '.join(ll[1:])
+            else:
+                sentence = ll[0]
             self.addSentence(sentence)
 
         print("Read %s sentences" % len(lines))
@@ -147,9 +150,12 @@ class KaldiReadIn(object):
     def load_next_nstreams(self):
         length = []
         feat_mat = []
+        lab_len =[]
         label = []
         nstreams = 0
         max_frame_num = 0
+        max_lab_len = 0
+        utt_lists =[]
         while True:
             utt_id,utt_mat = self.read_next_utt()
             if utt_mat is None:
@@ -165,6 +171,8 @@ class KaldiReadIn(object):
 
             if True: #(len(ali_utt) * 2 + 1) < len(utt_mat):
                 label.append(lab_index)
+                utt_lists.append(utt_id)
+                lab_len.append(len(lab_index))
                 '''if self.read_opts['lcxt'] != 0 or self.read_opts['rcxt'] != 0:
                     feat_mat.append(make_context(utt_mat, self.read_opts['lcxt'], self.read_opts['rcxt']))
                 else:
@@ -175,7 +183,10 @@ class KaldiReadIn(object):
                 continue
             if max_frame_num < length[nstreams]:
                 max_frame_num = length[nstreams]
+            if max_lab_len < lab_len[nstreams]:
+                max_lab_len =lab_len[nstreams]
             nstreams += 1
+
 
             if nstreams == self.batch_size:
                 res=max_frame_num % self.n_downsample
@@ -189,17 +200,18 @@ class KaldiReadIn(object):
                 while i < nstreams:
                     if max_frame_num != length[i]:
                         feat_mat[i] = numpy.vstack((feat_mat[i], numpy.zeros((max_frame_num-length[i], feat_mat[i].shape[1]),dtype=numpy.float32)))
-                    label[i] = numpy.hstack((label[i], numpy.zeros((self.max_lab_len-len(label[i])),dtype=numpy.int32)) )
+                    label[i] = numpy.hstack((label[i], numpy.zeros((max_lab_len-len(label[i])),dtype=numpy.int32)) )
                     i += 1
 
                 if feat_mat.__len__():
                     label_nstream = numpy.vstack(label)
                     feat_mat_nstream = numpy.vstack(feat_mat).reshape(nstreams, -1, self.feat_dim)
                     np_length = numpy.vstack(length).reshape(-1)
-                    yield feat_mat_nstream,label_nstream,np_length
-                    length,feat_mat,label = [],[],[]
+                    yield feat_mat_nstream,label_nstream,np_length,lab_len,utt_lists
+                    length,feat_mat,label,lab_len,utt_lists = [],[],[],[],[]
                     nstreams = 0
                     max_frame_num =0
+                    max_lab_len =0
                     #return feat_mat_nstream , label_nstream , np_length
                 else:
                     break

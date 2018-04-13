@@ -80,15 +80,15 @@ for epoch in range(num_epochs):
     # Training
     ###train_set return:
     ###batch_data: (batch, T, fea_dim), batch_label: (batch, T), batch_length: (batch, T),true length of utterence
-    for batch_index,(batch_data,batch_label,batch_length) in enumerate(train_set):
-        batch_label = OneHotEncode(batch_label, max_lab_len, max_idx = output_class_dim)
+    for batch_index,(batch_data,batch_label,batch_length,lab_len,utt_list) in enumerate(train_set):
+        batch_label = OneHotEncode(batch_label, max(lab_len), max_idx = output_class_dim)
         batch_data = torch.from_numpy(batch_data)
         batch_label = torch.from_numpy(batch_label)
         #if batch_index ==100:
         #    pdb.set_trace()
             #break
         #pdb.set_trace()
-        batch_loss, batch_ler = batch_iterator(batch_data, batch_label, listener, speller, optimizer, 
+        batch_loss, batch_ler = batch_iterator(batch_data, batch_label,lab_len, listener, speller, optimizer, 
                                                tf_rate, is_training=True, **conf['model_parameter'])
         tr_loss += batch_loss
         tr_ler.extend(batch_ler)
@@ -97,11 +97,11 @@ for epoch in range(num_epochs):
     training_time = float(time.time()-epoch_head)
     
     # Validating
-    for batch_index_val,(batch_data,batch_label,batch_length) in enumerate(valid_set):
+    for batch_index_val,(batch_data,batch_label,batch_length,lab_len, utt_list) in enumerate(valid_set):
         batch_label = OneHotEncode(batch_label, max_lab_len, max_idx = output_class_dim)
         batch_data = torch.from_numpy(batch_data)
         batch_label = torch.from_numpy(batch_label)
-        batch_loss, batch_ler = batch_iterator(batch_data, batch_label, listener, speller, optimizer, 
+        batch_loss, batch_ler = batch_iterator(batch_data, batch_label, lab_len, listener, speller, optimizer, 
                                                tf_rate, is_training=False, **conf['model_parameter'])
         valid_loss += batch_loss
         valid_ler.extend(batch_ler)

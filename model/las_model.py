@@ -88,7 +88,7 @@ class Speller(nn.Module):
 
         return raw_pred, hidden_state, context, attention_score
 
-    def forward(self, listener_feature, hid_state=None, ground_truth=None, teacher_force_rate = 0.9):
+    def forward(self, listener_feature, hid_state=None, ground_truth=None, label_len=None, teacher_force_rate = 0.9):
         if ground_truth is None:
             teacher_force_rate = 0
         teacher_force = True if np.random.random_sample() < teacher_force_rate else False
@@ -108,7 +108,8 @@ class Speller(nn.Module):
         raw_pred_seq = []
         output_seq = []
         attention_record = []
-        for step in range(self.max_label_len):
+        speller_max_step = max(label_len) if label_len is not None else self.max_label_len
+        for step in range(speller_max_step):
             raw_pred, hidden_state, context, attention_score = self.forward_step(rnn_input, hidden_state, listener_feature)
             raw_pred_seq.append(raw_pred)
             attention_record.append(attention_score)
