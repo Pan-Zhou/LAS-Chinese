@@ -1,0 +1,47 @@
+meta_variable:
+  experiment_name: 'las.bm3.IOS'             # Expriment title, log/checkpoint files will be named after this
+  checkpoint_dir: 'checkpoint/'               # Folder for model checkpoints, make sure created before running
+  training_log_dir: 'log/'                    # Folder for training logs, make sure created before running
+
+model_parameter:
+  max_timestep: 784                           # max_timestep%8 == 0 is required due to listener time resolution reduction
+  max_label_len: 40                           # max length of label 
+  input_feature_dim: 40                       # feature dim of the encoder input
+  listener_hidden_dim: 256                    # listener LSTM output dimension
+  use_mlp_in_attention: True                  # Set to False to exclude phi and psi in attention formula
+  mlp_dim_in_attention: 512                   # 
+  mlp_activate_in_attention: 'relu'           #
+  num_heads: 4                                # multi-head attention
+  speller_rnn_layer: 1                        # speller RNN layer number 
+  speller_hidden_dim: 512                     # speller LSTM output dimension
+  embed_dim: 512                              # embedding dimemsion
+  use_listener_state: True                    # use listener state as speller history
+  output_class_dim: 63                        # number of characters + 3 for <sos> & <eos> & <UNK>
+  rnn_unit: 'LSTM'                            # Default recurrent unit
+  use_gpu: True
+  bucketing: False                            # Bucket training data by input sequence length 
+  
+  language_scp: 'data/unique-chn'              # label list to load language info.
+  train_scp_path: 'data/train.scp'
+  train_lab_path: 'data/text.tr95'
+  valid_scp_path: 'data/feature_transform_testIOS.scp'
+  valid_lab_path: 'data/text.IOS'
+  kaldi_feat_dim: 40                          # original feature dim, e.g. 40 fbanks
+  left_cxt: 0                                 # frames of left context 
+  right_cxt: 0
+  n_skip_frame: 0                             # number of jump frames
+  n_downsample: 8
+  beam_width: 3
+
+training_parameter:
+  learning_rate: 0.0002
+  seed: 1                  
+  num_epochs: 30
+  tf_decay_epoch: 10                          # epoch from which teacher force rate begin to decay
+  batch_size: 1
+  tf_rate_upperbound: 1.0                     # teacher forcing rate during training will be linearly
+  tf_rate_lowerbound: 1.0                     # decayinn from upperbound to lower bound for each epoch
+  verbose_step: 200                           # Show progress every verbose_step
+  use_pretrained: True                       # Load a pretrained model, model path should be given
+  pretrained_listener_path: 'checkpoint/1khlas.1kh.listener' 
+  pretrained_speller_path: 'checkpoint/1khlas.1kh.speller' 
