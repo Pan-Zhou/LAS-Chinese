@@ -39,8 +39,9 @@ This is a pytorch implementation of attention based end to end model, LAS, for s
     For a customized experiment, please read and modify [`config/las_bank_config.yaml`](config/las_fbank_config.yaml)
 
 ## ToDo
-- Add attention mechanism
-- Beam search decoding
+- Additive attention mechanism (done)
+- Beam search decoding (done)
+- label smoothing & confidence penalty regularization (done)
 - Rescore or decode with Language model 
 - Chinese initial finals modeling units
 - Attention Visualize

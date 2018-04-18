@@ -59,7 +59,7 @@ class Listener(nn.Module):
 # Speller specified in the paper
 class Speller(nn.Module):
     def __init__(self, output_class_dim, embed_dim, use_listener_state, speller_hidden_dim, rnn_unit, speller_rnn_layer, use_gpu, max_label_len,
-                 use_mlp_in_attention, mlp_dim_in_attention, mlp_activate_in_attention, num_heads, listener_hidden_dim, **kwargs):
+                 use_mlp_in_attention, mlp_dim_in_attention, mlp_activate_in_attention, num_heads, atten_type, listener_hidden_dim, **kwargs):
         super(Speller, self).__init__()
         self.rnn_unit = getattr(nn,rnn_unit.upper())
         self.max_label_len = max_label_len
@@ -71,7 +71,7 @@ class Speller(nn.Module):
         self.embedding = nn.Embedding(output_class_dim, embed_dim)
         self.rnn_layer = self.rnn_unit(embed_dim+2*listener_hidden_dim,speller_hidden_dim,num_layers=speller_rnn_layer,batch_first=True)
         self.attention = Attention( mlp_preprocess_input=use_mlp_in_attention, preprocess_mlp_dim=mlp_dim_in_attention,
-                                    activate=mlp_activate_in_attention, heads=num_heads, input_feature_dim=2*listener_hidden_dim)
+                                    activate=mlp_activate_in_attention, heads=num_heads, mode=atten_type, input_feature_dim=2*listener_hidden_dim)
         self.predict_hid = nn.Linear(speller_hidden_dim*2,512)
         self.nonlinear = nn.ReLU()
         self.character_distribution = nn.Linear(512,output_class_dim)
@@ -88,10 +88,7 @@ class Speller(nn.Module):
 
         return raw_pred, hidden_state, context, attention_score
 
-    def forward(self, listener_feature, hid_state=None, ground_truth=None, label_len=None, teacher_force_rate = 0.9):
-        if ground_truth is None:
-            teacher_force_rate = 0
-        teacher_force = True if np.random.random_sample() < teacher_force_rate else False
+    def forward(self, listener_feature, hid_state=None, ground_truth=None,label_len=None, teacher_force_rate = 0.9):
 
         batch_size = listener_feature.size()[0]
 
@@ -113,6 +110,9 @@ class Speller(nn.Module):
             raw_pred, hidden_state, context, attention_score = self.forward_step(rnn_input, hidden_state, listener_feature)
             raw_pred_seq.append(raw_pred)
             attention_record.append(attention_score)
+            if ground_truth is None:
+                teacher_force_rate = 0
+            teacher_force = True if np.random.random_sample() < teacher_force_rate else False
             # Teacher force - use ground truth as next step's input
             if teacher_force:
                 output_word_onehot = ground_truth[:,step:step+1,:].type(self.float_type)
@@ -138,22 +138,33 @@ class Attention(nn.Module):
         super(Attention,self).__init__()
         self.mode = mode.lower()
         self.mlp_preprocess_input = mlp_preprocess_input
-        self.relu = nn.ReLU()
+        #self.relu = nn.ReLU()
+        #self.tanh = nn.Tanh()
         self.num_heads = heads
-        self.head_dim = int(input_feature_dim/heads)
+        self.head_dim = int(preprocess_mlp_dim/heads)
         self.softmax = nn.Softmax(dim=-1)
+        if self.num_heads >1:
+            self.proj = nn.Linear(input_feature_dim * self.num_heads, input_feature_dim)
         if mlp_preprocess_input:
             self.preprocess_mlp_dim  = preprocess_mlp_dim
-            self.phi = nn.Linear(input_feature_dim,preprocess_mlp_dim)
-            self.psi = nn.Linear(input_feature_dim,preprocess_mlp_dim)
             self.activate = getattr(F,activate)
+            if self.mode == 'dot':
+                self.phi = nn.Linear(input_feature_dim,preprocess_mlp_dim)
+                self.psi = nn.Linear(input_feature_dim,preprocess_mlp_dim)
             if self.mode == 'add':
-                self.w = nn.Linear(preprocess_mlp_dim,1)
+                self.hid = nn.Linear(input_feature_dim *2 , preprocess_mlp_dim)
+                self.out = nn.Linear(self.head_dim, self.num_heads)
 
     def forward(self, decoder_state, listener_feature):
         if self.mlp_preprocess_input:
-            comp_decoder_state = self.relu(self.phi(decoder_state))
-            comp_listener_feature = self.relu(TimeDistributed(self.psi,listener_feature))
+            if self.mode == 'dot':
+                comp_decoder_state = self.activate(self.phi(decoder_state))
+                comp_listener_feature = self.activate(TimeDistributed(self.psi,listener_feature))
+            if self.mode == 'add':
+                curT = listener_feature.size(1)
+                ## tanh( W * s + V * h + b), concate s and h, [s,h]
+                atten_input = torch.cat((decoder_state.repeat(1, curT, 1), listener_feature), 2)
+                atten_hid = self.activate(self.hid(atten_input))
         else:
             comp_decoder_state = decoder_state
             comp_listener_feature = listener_feature
@@ -164,16 +175,18 @@ class Attention(nn.Module):
             ed_idx = (idx+1)*self.head_dim
             if self.mode == 'dot':
                 energy = torch.bmm(comp_decoder_state[:,:,st_idx:ed_idx],comp_listener_feature.transpose(1, 2)[:,st_idx:ed_idx,:]).squeeze(dim=1)
-            if self.mode == 'add':
-                pass
+            elif self.mode == 'add':
+                energy = (self.out(atten_hid[:,:,st_idx:ed_idx])[:,:,idx:idx+1]).squeeze(dim=2)
             else:
                 # TODO: other attention implementations
                 pass
             attention_score_idx = self.softmax(energy)
-            context_idx = torch.sum(listener_feature[:,:,st_idx:ed_idx]*attention_score_idx.unsqueeze(2).repeat(1,1,self.head_dim),dim=1)
+            context_idx = torch.sum(listener_feature * attention_score_idx.unsqueeze(2).repeat(1,1,self.head_dim * self.num_heads),dim=1)
             temp.append(context_idx)
-
         context = torch.cat(temp,1)
+        if self.num_heads > 1:
+            context = self.proj(context)
+        ####attention_score_idx need to be modified,if one want to use the returned attention weights
         return attention_score_idx,context
 
 

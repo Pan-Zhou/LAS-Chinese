@@ -26,6 +26,7 @@ verbose_step = conf['training_parameter']['verbose_step']
 tf_rate_upperbound = conf['training_parameter']['tf_rate_upperbound']
 tf_rate_lowerbound = conf['training_parameter']['tf_rate_lowerbound']
 tf_decay_epoch = conf['training_parameter']['tf_decay_epoch']
+tf_keep_epoch = 7
 
 lang = Language(conf['model_parameter']['language_scp'])
 output_class_dim = lang.n_words
@@ -56,11 +57,11 @@ speller_model_path = conf['meta_variable']['checkpoint_dir']+conf['meta_variable
 
 ###print arguments setting
 for key in conf:
-    print('{}:'.format(key))
+    print('{}:'.format(key),file=traing_log)
     for para in conf[key]:
-        print('{:50}:{}'.format(para,conf[key][para]))
-    print('\n')
-print('please check.',flush=True)
+        print('{:50}:{}'.format(para,conf[key][para]),file=traing_log)
+    print('\n',file=traing_log)
+print('please check.',flush=True,file=traing_log)
 
 best_ler = 1.0
 for epoch in range(num_epochs):
@@ -72,11 +73,11 @@ for epoch in range(num_epochs):
     valid_loss = 0.0
     valid_ler = []
 
-    # Teacher forcing rate linearly decay after a certain epoch
+    # Teacher forcing rate linearly decay to lowerbound from tf_decay_epoch epoch then keep unchanged
     if epoch < tf_decay_epoch:
         tf_rate = 1.0
     else:
-        tf_rate = tf_rate_upperbound - (tf_rate_upperbound-tf_rate_lowerbound)*((epoch - tf_decay_epoch)/(num_epochs - tf_decay_epoch))
+        tf_rate = tf_rate_upperbound - (tf_rate_upperbound-tf_rate_lowerbound)*((epoch+1 - tf_decay_epoch)/(tf_keep_epoch - tf_decay_epoch))
     # Training
     ###train_set return:
     ###batch_data: (batch, T, fea_dim), batch_label: (batch, T), batch_length: (batch, T),true length of utterence
@@ -97,10 +98,11 @@ for epoch in range(num_epochs):
     training_time = float(time.time()-epoch_head)
     
     # Validating
-    for batch_index_val,(batch_data,batch_label,batch_length,lab_len, utt_list) in enumerate(valid_set):
+    for batch_index_val,(batch_data,batch_label,batch_length,lab_len,utt_list) in enumerate(valid_set):
         batch_label = OneHotEncode(batch_label, max_lab_len, max_idx = output_class_dim)
         batch_data = torch.from_numpy(batch_data)
         batch_label = torch.from_numpy(batch_label)
+        tf_rate=0
         batch_loss, batch_ler = batch_iterator(batch_data, batch_label, lab_len, listener, speller, optimizer, 
                                                tf_rate, is_training=False, **conf['model_parameter'])
         valid_loss += batch_loss

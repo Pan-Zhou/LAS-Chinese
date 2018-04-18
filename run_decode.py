@@ -1,5 +1,6 @@
 import yaml
 from model.las_model import Listener,Speller
+#from model.las_model_sampling import Listener,Speller
 from util.kaldi_feat import KaldiReadIn,Language,OneHotEncode
 from util.beamsearch import BeamSearch
 from util.functions import LetterErrorRate
@@ -31,6 +32,7 @@ valid_lab_path = conf['model_parameter']['valid_lab_path']
 valid_set = KaldiReadIn(lang, valid_scp_path, valid_lab_path, **conf['model_parameter'],**conf['training_parameter'])
 
 # Construct LAS Model or load pretrained LAS model
+#pdb.set_trace()
 if not use_pretrained:
     traing_log = open(conf['meta_variable']['training_log_dir']+conf['meta_variable']['experiment_name']+'.log','w')
     listener = Listener(**conf['model_parameter'])
