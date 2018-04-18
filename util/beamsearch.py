@@ -34,7 +34,7 @@ class BeamSearch(object):
             posterior, hidden_state, context, atten_score = self.speller.forward_step(rnn_input,seq[2],listener_feature)
             
             ##sort posterior, should use logAdd to avoid numerical underflow
-            post_host = torch.exp(posterior.cpu().data)
+            post_host = posterior.cpu().data
             out_post =[(idx,post) for idx,post in enumerate(post_host[0])]
             out_post = sorted(out_post, key = lambda x:x[1],reverse=True)
             
@@ -42,7 +42,7 @@ class BeamSearch(object):
                 char_idx = out_post[i][0]
                 char_post = out_post[i][1]
                 ####use logAdd later...
-                score = seq[1] *  char_post
+                score = seq[1] +  char_post
                 done = (char_idx == 1)
                 rs_seq = [seq[0] + [char_idx],score, hidden_state, context,done]
                 all_seqs.append(rs_seq)
@@ -60,7 +60,7 @@ class BeamSearch(object):
             data=data.cuda()
         listener_feature, hid_state0 = self.listener(data)
         ###init top_seqs, each seq contain [[unit idx], seq_score, hid_state, context, is_done]
-        top_seqs =[ [[0],1.0,hid_state0, listener_feature[:,0:1,:],False] ]
+        top_seqs =[ [[0],0.0,hid_state0, listener_feature[:,0:1,:],False] ]
         
         for step in range(self.max_decode_step):
             top_seqs, all_done = self.beam_search_step(listener_feature, top_seqs)
