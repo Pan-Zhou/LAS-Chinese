@@ -110,6 +110,7 @@ class Speller(nn.Module):
             raw_pred, hidden_state, context, attention_score = self.forward_step(rnn_input, hidden_state, listener_feature)
             raw_pred_seq.append(raw_pred)
             attention_record.append(attention_score)
+            ##use schedule sampling  every step
             if ground_truth is None:
                 teacher_force_rate = 0
             teacher_force = True if np.random.random_sample() < teacher_force_rate else False

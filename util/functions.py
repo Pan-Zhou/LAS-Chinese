@@ -38,12 +38,25 @@ def TimeDistributed(input_module, input_x):
 # compute cross entropy loss use mask
 def CELoss(output,label):
     mask = (label>0)
-    output = F.log_softmax(output)
+    output = F.log_softmax(output,dim=1)
     labselect = label# +(label<=0).long()
     select = -torch.gather(output,1,labselect.view(-1,1))
     losses = mask.float().cuda().view(-1,1)*select
     loss = torch.sum(losses)/torch.sum(mask.float())
     return loss
+
+def CELoss_with_uniformprior(output,num_class,label):
+    mask = (label>0)
+    output = F.log_softmax(output,dim=1)
+    losses = mask.float().cuda().view(-1,1)* torch.sum(output,1).view(-1,1)/num_class
+    return -torch.sum(losses)/torch.sum(mask.float())
+
+def CalcEntropy(output,label):
+    mask = (label>0)
+    log_output = F.log_softmax(output,dim=1)
+    posterior = -F.softmax(output,dim=1)
+    losses = mask.float().cuda().view(-1,1)*torch.sum(posterior*log_output,1).view(-1,1)
+    return torch.sum(losses)/torch.sum(mask.float())
 
 # LetterErrorRate function
 # Merge the repeated prediction and calculate editdistance of prediction and ground truth
@@ -63,11 +76,15 @@ def LetterErrorRate(pred_y,true_y):
         ed_accumalate.append(ed.eval(compressed_p,compressed_t)/len(compressed_t))
     return ed_accumalate
 
-def batch_iterator(batch_data, batch_label, lab_len, listener, speller, optimizer, tf_rate, is_training, **kwargs):
+def batch_iterator(batch_data, batch_label,lab_len, listener, speller, optimizer, tf_rate, is_training, **kwargs):
     bucketing = kwargs['bucketing']
     use_gpu = kwargs['use_gpu']
     max_label_len = kwargs['max_label_len']
     output_class_dim = kwargs['output_class_dim']
+    use_lab_smoothing = kwargs['use_label_smoothing']
+    lab_smoothing_alpha = kwargs['label_smoothing_alpha']
+    use_confidence_penalty = kwargs['use_confidence_penalty']
+    confidence_penalty_beta = kwargs['confidence_penalty_beta']
     # Load data
     if bucketing:
         batch_data = batch_data.squeeze(dim=0)
@@ -84,15 +101,20 @@ def batch_iterator(batch_data, batch_label, lab_len, listener, speller, optimize
     optimizer.zero_grad()
     listner_feature, hid_state0 = listener(batch_data)
     if is_training:
-        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=batch_label, label_len=lab_len, teacher_force_rate=tf_rate)
+        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=batch_label,label_len=lab_len, teacher_force_rate=tf_rate)
     else:
-        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=None,label_len = None, teacher_force_rate=0)
+        raw_pred_seq, attention_record = speller(listner_feature,hid_state =hid_state0, ground_truth=None,label_len=None, teacher_force_rate=0)
 
     pred_y = torch.cat([torch.unsqueeze(each_y,1) for each_y in raw_pred_seq],1).view(-1,output_class_dim)
     true_y = torch.max(batch_label,dim=2)[1].view(-1)
 
     loss = objective(pred_y,true_y)
-
+    if use_lab_smoothing:
+        loss1= CELoss_with_uniformprior(pred_y,output_class_dim,true_y)
+        loss = loss * (1-lab_smoothing_alpha) + loss1 * lab_smoothing_alpha
+    if use_confidence_penalty:
+        loss1= CalcEntropy(pred_y,true_y)
+        loss = loss - confidence_penalty_beta * loss1
     #loss = CELoss(pred_y,true_y)
     if is_training:
         loss.backward()

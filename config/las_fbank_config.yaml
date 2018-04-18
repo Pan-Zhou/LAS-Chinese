@@ -12,6 +12,7 @@ model_parameter:
   mlp_dim_in_attention: 512                   # 
   mlp_activate_in_attention: 'relu'           #
   num_heads: 1                                # multi-head attention
+  atten_type: 'add'                           # additive or dot product
   speller_rnn_layer: 1                        # speller RNN layer number 
   speller_hidden_dim: 512                     # speller LSTM output dimension
   embed_dim: 512                              # embedding dimemsion
@@ -31,6 +32,10 @@ model_parameter:
   right_cxt: 0
   n_skip_frame: 0                             # number of jump frames
   n_downsample: 8
+  use_label_smoothing: True                   #use uniform prior distribution as regularization
+  label_smoothing_alpha: 0.1
+  use_confidence_penalty: False
+  confidence_penalty_beta: 2.0
 
 training_parameter:
   learning_rate: 0.0002
